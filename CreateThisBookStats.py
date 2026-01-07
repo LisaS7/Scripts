@@ -1,6 +1,7 @@
 import json
 import random
 from dataclasses import dataclass
+from typing import Any
 
 BAR_WIDTH = 30
 GREEN = "\033[32m"
@@ -17,7 +18,7 @@ class Prompt:
     completed: bool
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict[str, Any]) -> "Prompt":
         return cls(
             page=int(data["page"]),
             prompt=str(data["prompt"]),
@@ -40,6 +41,7 @@ class Stats:
     @classmethod
     def build(
         cls,
+        *,
         completed: list[Prompt],
         started: list[Prompt],
         remaining: list[Prompt],
@@ -97,7 +99,7 @@ def pick_random(remaining: list[Prompt]) -> Prompt:
     return random.choice(remaining)
 
 
-def print_stats(stats) -> None:
+def print_stats(stats: Stats) -> None:
     print()
     print("Create This Book Progress")
     print("=" * 24)
