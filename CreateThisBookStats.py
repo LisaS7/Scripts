@@ -131,9 +131,13 @@ def main() -> None:
 
     print_stats(stats)
 
-    pick = pick_random(remaining)
-    print("Next new prompt:")
-    print(f"  P{pick.page}: {pick.prompt}")
+    if started:
+        pick = pick_random(started)
+        print(f"You should finish P{pick.page}: {pick.prompt}")
+    else:
+        pick = pick_random(remaining)
+        print("Next new prompt:")
+        print(f"  P{pick.page}: {pick.prompt}")
 
 
 if __name__ == "__main__":
