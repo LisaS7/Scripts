@@ -4,10 +4,15 @@ from dataclasses import dataclass
 from typing import Any
 
 BAR_WIDTH = 30
+PASTEL_BLUE = "\033[38;2;173;216;230m"
 GREEN = "\033[32m"
-YELLOW = "\033[33m"
+YELLOW = "\033[38;2;255;244;179m"
 GREY = "\033[90m"
 RESET = "\033[0m"
+
+SQUARES_PER_ROW = 30
+SQUARE = "█"
+NONSQUARE = "░"
 
 
 @dataclass(frozen=True)
@@ -55,7 +60,7 @@ class Stats:
         )
 
     def bar(self, width: int = BAR_WIDTH) -> str:
-        """Coloured stacked bar: completed (green), started (yellow), remaining (grey)."""
+        """Coloured stacked bar: completed, started, remaining."""
         if self.total == 0:
             return f"{GREY}{'░' * width}{RESET}"
 
@@ -69,11 +74,34 @@ class Stats:
         remaining_width = width - completed_width - started_width
 
         return (
-            f"{GREEN}{'█' * completed_width}"
-            f"{YELLOW}{'█' * started_width}"
-            f"{GREY}{'░' * remaining_width}"
+            f"{PASTEL_BLUE}{SQUARE * completed_width}"
+            f"{YELLOW}{SQUARE * started_width}"
+            f"{GREY}{NONSQUARE * remaining_width}"
             f"{RESET}"
         )
+
+
+def render_page_grid(prompts: list[Prompt], width: int = SQUARES_PER_ROW) -> str:
+    """
+    Grid in page order.
+    """
+    if not prompts:
+        return ""
+
+    # Sort by page number so the grid matches the book.
+    prompts_sorted = sorted(prompts, key=lambda p: p.page)
+
+    cells: list[str] = []
+    for p in prompts_sorted:
+        if p.completed:
+            cells.append(f"{PASTEL_BLUE}{SQUARE}{RESET}")
+        elif p.started:
+            cells.append(f"{YELLOW}{SQUARE}{RESET}")
+        else:
+            cells.append(f"{GREY}{NONSQUARE}{RESET}")
+
+    lines = ["".join(cells[i : i + width]) for i in range(0, len(cells), width)]
+    return "\n".join(lines)
 
 
 def load_data(filename: str) -> list[Prompt]:
@@ -130,6 +158,10 @@ def main() -> None:
         return
 
     print_stats(stats)
+
+    print("Pages:")
+    print(render_page_grid(data))
+    print()
 
     if started:
         pick = pick_random(started)
