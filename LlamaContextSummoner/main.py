@@ -3,6 +3,13 @@ from pathlib import Path
 
 import requests
 
+# TODO:
+# switch from /generate to /chat and maintain a chat history
+# Run from the command line with args
+# Add a list-projects command
+# Stop reading the whole vault on every run. Cache last mod time?
+# Arg to output to xml file?
+
 OBSIDIAN_ROOT = Path("/home/lisa/Documents/TheLedger")
 CACHE_PATH = "obsidian_cache.json"
 LLAMA_LOCATION = "http://localhost:11434/api/generate"
