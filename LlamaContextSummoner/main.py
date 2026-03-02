@@ -3,8 +3,10 @@ from pathlib import Path
 
 import requests
 
-# TODO:
+# In Progress:
 # switch from /generate to /chat and maintain a chat history
+
+# TODO:
 # Run from the command line with args
 # Add a list-projects command
 # Stop reading the whole vault on every run. Cache last mod time?
@@ -12,7 +14,7 @@ import requests
 
 OBSIDIAN_ROOT = Path("/home/lisa/Documents/TheLedger")
 CACHE_PATH = "obsidian_cache.json"
-LLAMA_LOCATION = "http://localhost:11434/api/generate"
+LLAMA_LOCATION = "http://localhost:11434/api/chat"
 
 
 # --------------- FILE STUFF ---------------
@@ -66,12 +68,12 @@ def get_project_context(project_name: str):
 # --------------- MODEL STUFF ---------------
 
 
-def ask_model(prompt: str, model: str = "llama3"):
+def ask_model(messages: list[dict], model: str = "llama3"):
     response = requests.post(
         LLAMA_LOCATION,
         json={
             "model": model,
-            "prompt": prompt,
+            "messages": messages,
             "stream": False,
         },
         timeout=120,
@@ -79,7 +81,7 @@ def ask_model(prompt: str, model: str = "llama3"):
 
     response.raise_for_status()
     data = response.json()
-    return data["response"]
+    return data["message"]["content"]
 
 
 # --------------- RUN IT ---------------
@@ -90,18 +92,22 @@ def main():
     context = get_project_context(project)
     user_query = "Summarise my current DrawABox progress and suggest next steps."
 
-    full_prompt = f"""
-            You are assisting with project: {project}
+    messages = [
+        {
+            "role": "system",
+            "content": f"You are assisting with project: {project}.",
+        },
+        {
+            "role": "system",
+            "content": f"PROJECT FILES:\n----------------\n{context}\n----------------",
+        },
+        {
+            "role": "user",
+            "content": user_query,
+        },
+    ]
 
-            PROJECT FILES:
-            ----------------
-            {context}
-            ----------------
-
-            TASK:
-            {user_query}
-            """
-    answer = ask_model(full_prompt)
+    answer = ask_model(messages)
 
     print("\n--- MODEL RESPONSE ---\n")
     print(answer)
