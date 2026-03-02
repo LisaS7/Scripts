@@ -1,8 +1,14 @@
 import re
 from pathlib import Path
 
+import requests
+
 OBSIDIAN_ROOT = Path("/home/lisa/Documents/TheLedger")
 CACHE_PATH = "obsidian_cache.json"
+LLAMA_LOCATION = "http://localhost:11434/api/generate"
+
+
+# --------------- FILE STUFF ---------------
 
 
 def extract_frontmatter(path: Path):
@@ -50,9 +56,48 @@ def get_project_context(project_name: str):
     return full_context
 
 
+# --------------- MODEL STUFF ---------------
+
+
+def ask_model(prompt: str, model: str = "llama3"):
+    response = requests.post(
+        LLAMA_LOCATION,
+        json={
+            "model": model,
+            "prompt": prompt,
+            "stream": False,
+        },
+        timeout=120,
+    )
+
+    response.raise_for_status()
+    data = response.json()
+    return data["response"]
+
+
+# --------------- RUN IT ---------------
+
+
 def main():
-    context = get_project_context("DrawABox")
-    print(context[:1000])  # preview first 1000 chars
+    project = "DrawABox"
+    context = get_project_context(project)
+    user_query = "Summarise my current DrawABox progress and suggest next steps."
+
+    full_prompt = f"""
+            You are assisting with project: {project}
+
+            PROJECT FILES:
+            ----------------
+            {context}
+            ----------------
+
+            TASK:
+            {user_query}
+            """
+    answer = ask_model(full_prompt)
+
+    print("\n--- MODEL RESPONSE ---\n")
+    print(answer)
 
 
 if __name__ == "__main__":
