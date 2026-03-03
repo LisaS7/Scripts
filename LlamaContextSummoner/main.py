@@ -4,7 +4,7 @@ from pathlib import Path
 import requests
 
 # In Progress:
-# switch from /generate to /chat and maintain a chat history
+# Don't load the entire file to get frontmatter
 
 # TODO:
 # Make interactive mode optional?
@@ -17,9 +17,18 @@ import requests
 OBSIDIAN_ROOT = Path("/home/lisa/Documents/TheLedger")
 CACHE_PATH = "obsidian_cache.json"
 LLAMA_LOCATION = "http://localhost:11434/api/chat"
+MAIN_PROMPT_PATH = Path(
+    "/home/lisa/Documents/TheLedger/Areas/The Workshop/Llama/main_prompt.md"
+)
 
 
 # --------------- FILE STUFF ---------------
+
+
+def load_file(path: Path) -> str:
+    if not path.exists():
+        raise FileNotFoundError(f"Missing file: {path}")
+    return path.read_text(encoding="utf-8")
 
 
 def extract_frontmatter(path: Path):
@@ -91,9 +100,14 @@ def ask_model(messages: list[dict], model: str = "llama3"):
 
 def main():
     project = "DrawABox"
+    main_prompt = load_file(MAIN_PROMPT_PATH)
     context = get_project_context(project)
 
     history = [
+        {
+            "role": "system",
+            "content": main_prompt,
+        },
         {"role": "system", "content": f"You are assisting with project: {project}."},
         {
             "role": "system",
@@ -101,11 +115,11 @@ def main():
         },
     ]
 
-    print("\nInteractive mode. Type 'quit' to exit.")
+    print("\n🦙 Interactive mode. Type 'quit' to exit.")
 
     while True:
         # Get the input from the user
-        user_query = input("\nYou: ").strip()
+        user_query = input("\nYou 🖤🕯️ > ").strip()
         if not user_query:
             continue
         if user_query.lower() in {"exit", "quit", "q"}:
@@ -116,13 +130,8 @@ def main():
         answer = ask_model(history)
         history.append({"role": "assistant", "content": answer})
 
-        print("\Llama:\n")
+        print("\nLlama 🦙 >\n")
         print(answer)
-
-    answer = ask_model(history)
-
-    print("\n--- MODEL RESPONSE ---\n")
-    print(answer)
 
 
 if __name__ == "__main__":
