@@ -7,6 +7,8 @@ import requests
 # switch from /generate to /chat and maintain a chat history
 
 # TODO:
+# Make interactive mode optional?
+# Deal with context window filling up
 # Run from the command line with args
 # Add a list-projects command
 # Stop reading the whole vault on every run. Cache last mod time?
@@ -90,24 +92,34 @@ def ask_model(messages: list[dict], model: str = "llama3"):
 def main():
     project = "DrawABox"
     context = get_project_context(project)
-    user_query = "Summarise my current DrawABox progress and suggest next steps."
 
-    messages = [
-        {
-            "role": "system",
-            "content": f"You are assisting with project: {project}.",
-        },
+    history = [
+        {"role": "system", "content": f"You are assisting with project: {project}."},
         {
             "role": "system",
             "content": f"PROJECT FILES:\n----------------\n{context}\n----------------",
         },
-        {
-            "role": "user",
-            "content": user_query,
-        },
     ]
 
-    answer = ask_model(messages)
+    print("\nInteractive mode. Type 'quit' to exit.")
+
+    while True:
+        # Get the input from the user
+        user_query = input("\nYou: ").strip()
+        if not user_query:
+            continue
+        if user_query.lower() in {"exit", "quit", "q"}:
+            break
+
+        # Ask model, and add both query and response to history
+        history.append({"role": "user", "content": user_query})
+        answer = ask_model(history)
+        history.append({"role": "assistant", "content": answer})
+
+        print("\Llama:\n")
+        print(answer)
+
+    answer = ask_model(history)
 
     print("\n--- MODEL RESPONSE ---\n")
     print(answer)
