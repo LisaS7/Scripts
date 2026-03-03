@@ -4,15 +4,15 @@ from pathlib import Path
 import requests
 
 # In Progress:
-# Don't load the entire file to get frontmatter
+# Run from the command line with args
 
 # TODO:
 # Make interactive mode optional?
 # Deal with context window filling up
-# Run from the command line with args
 # Add a list-projects command
 # Stop reading the whole vault on every run. Cache last mod time?
 # Arg to output to xml file?
+# Add a reload command in interactive mode in case context files are edited
 
 OBSIDIAN_ROOT = Path("/home/lisa/Documents/TheLedger")
 CACHE_PATH = "obsidian_cache.json"
@@ -20,6 +20,9 @@ LLAMA_LOCATION = "http://localhost:11434/api/chat"
 MAIN_PROMPT_PATH = Path(
     "/home/lisa/Documents/TheLedger/Areas/The Workshop/Llama/main_prompt.md"
 )
+
+# Increase this if the script is not capturing the entire frontmatter
+FRONTMATTER_READ_LIMIT = 2048  # bytes
 
 
 # --------------- FILE STUFF ---------------
@@ -32,8 +35,10 @@ def load_file(path: Path) -> str:
 
 
 def extract_frontmatter(path: Path):
-    with path.open("r", encoding="utf-8") as f:
-        text = f.read()
+    with path.open("rb", encoding="utf-8") as f:
+        # only read a small amount of data from the beginning of the file
+        prefix = f.read(FRONTMATTER_READ_LIMIT)
+        text = prefix.decode("utf-8", errors="ignore")
 
     if not text.startswith("---"):
         return {}
