@@ -35,7 +35,7 @@ def load_file(path: Path) -> str:
 
 
 def extract_frontmatter(path: Path):
-    with path.open("rb", encoding="utf-8") as f:
+    with path.open("rb") as f:
         # only read a small amount of data from the beginning of the file
         prefix = f.read(FRONTMATTER_READ_LIMIT)
         text = prefix.decode("utf-8", errors="ignore")
