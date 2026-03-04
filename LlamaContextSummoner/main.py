@@ -182,11 +182,13 @@ def summarise_conversation(history: list[dict], model: str):
     ]
 
     summary, usage = ask_model(summary_prompt, model=model)
+    print("Conversation summary: ")
+    print(summary)
 
     new_history = system_prefix + [
         {
-            "role": "system",
-            "content": "CONVERSATION SUMMARY (most recent):\n" + summary.strip(),
+            "role": "assistant",
+            "content": "Summary of our conversation so far:\n" + summary.strip(),
         }
     ]
 
@@ -263,9 +265,7 @@ def main():
         return
 
     # Otherwise run in interactive mode
-    print(
-        "\n🦙 Interactive mode. Type 'quit' to exit. Type ':reload' to reload context."
-    )
+    print("\n🦙 Interactive mode. Type 'quit' to exit. Commands: :reload, :summarise")
 
     while True:
         # Get the input from the user
@@ -282,6 +282,11 @@ def main():
                 print("\n🔄 Reloading context from vault...\n")
                 history = build_history(project)
                 print("✅ Reloaded.\n")
+                continue
+            case ":summarise" | ":summarize":
+                print("\n📝 Summarising conversation...\n")
+                history = summarise_conversation(history, model=model)
+                print("✅ Summarised.\n")
                 continue
 
         # Ask model, and add both query and response to history
