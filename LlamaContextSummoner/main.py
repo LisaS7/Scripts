@@ -145,6 +145,30 @@ def build_history(project: str):
     ]
 
 
+def ask_model(messages: list[dict], model: str = "llama3"):
+    response = requests.post(
+        LLAMA_LOCATION,
+        json={
+            "model": model,
+            "messages": messages,
+            "stream": False,
+        },
+        timeout=120,
+    )
+
+    response.raise_for_status()
+    data = response.json()
+
+    content = data["message"]["content"]
+
+    usage = {
+        "prompt_eval_count": data.get("prompt_eval_count"),
+        "eval_count": data.get("eval_count"),
+    }
+
+    return content, usage
+
+
 def summarise_conversation(history: list[dict], model: str):
     SYSTEM_PREFIX_LEN = 3
     system_prefix = history[:SYSTEM_PREFIX_LEN]
@@ -199,28 +223,43 @@ def summarise_conversation(history: list[dict], model: str):
     return new_history
 
 
-def ask_model(messages: list[dict], model: str = "llama3"):
-    response = requests.post(
-        LLAMA_LOCATION,
-        json={
-            "model": model,
-            "messages": messages,
-            "stream": False,
-        },
-        timeout=120,
+def print_history_stats(
+    history: list[dict],
+    last_usage: dict | None,
+    total_prompt_tokens: int,
+    total_output_tokens: int,
+):
+    role_counts = {"system": 0, "user": 0, "assistant": 0, "other": 0}
+    has_summary = False
+
+    for msg in history:
+        role = msg.get("role", "other")
+        if role in role_counts:
+            role_counts[role] += 1
+        else:
+            role_counts["other"] += 1
+
+        content = msg.get("content", "")
+        if isinstance(content, str) and content.startswith(
+            "Summary of our conversation so far:"
+        ):
+            has_summary = True
+
+    print("\n📚 HISTORY STATS")
+    print(f"- messages: {len(history)}")
+    print(
+        f"- roles: system={role_counts['system']} user={role_counts['user']} assistant={role_counts['assistant']} other={role_counts['other']}"
     )
+    print(f"- summary present: {'yes' if has_summary else 'no'}")
 
-    response.raise_for_status()
-    data = response.json()
+    if last_usage:
+        print(
+            f"- last call tokens: in={last_usage.get('prompt_eval_count')} out={last_usage.get('eval_count')}"
+        )
+    else:
+        print("- last call tokens: (none yet)")
 
-    content = data["message"]["content"]
-
-    usage = {
-        "prompt_eval_count": data.get("prompt_eval_count"),
-        "eval_count": data.get("eval_count"),
-    }
-
-    return content, usage
+    print(f"- totals: in={total_prompt_tokens} out={total_output_tokens}\n")
 
 
 # --------------- RUN IT ---------------
@@ -250,11 +289,13 @@ def main():
 
     total_prompt_tokens = 0
     total_output_tokens = 0
+    last_usage = None
 
     # If a question is provided then run non-interactive
     if user_question:
         history.append({"role": "user", "content": user_question})
         answer, usage = ask_model(history, model=model)
+        last_usage = usage
         total_prompt_tokens += usage.get("prompt_eval_count") or 0
         total_output_tokens += usage.get("eval_count") or 0
         print("\n🦙 >\n")
@@ -265,7 +306,9 @@ def main():
         return
 
     # Otherwise run in interactive mode
-    print("\n🦙 Interactive mode. Type 'quit' to exit. Commands: :reload, :summarise")
+    print(
+        "\n🦙 Interactive mode. Type 'quit' to exit. Commands: :reload, :summarise, :history"
+    )
 
     while True:
         # Get the input from the user
@@ -288,10 +331,16 @@ def main():
                 history = summarise_conversation(history, model=model)
                 print("✅ Summarised.\n")
                 continue
+            case ":history" | ":stats":
+                print_history_stats(
+                    history, last_usage, total_prompt_tokens, total_output_tokens
+                )
+                continue
 
         # Ask model, and add both query and response to history
         history.append({"role": "user", "content": user_query})
         answer, usage = ask_model(history, model=model)
+        last_usage = usage
         total_prompt_tokens += usage.get("prompt_eval_count") or 0
         total_output_tokens += usage.get("eval_count") or 0
         history.append({"role": "assistant", "content": answer})
