@@ -5,13 +5,12 @@ from pathlib import Path
 import requests
 
 # In Progress:
-# Add a list-projects command
+# Add a reload command in interactive mode in case context files are edited
 
 # TODO:
 # Deal with context window filling up
 # Stop reading the whole vault on every run. Cache last mod time?
 # Arg to output to xml file?
-# Add a reload command in interactive mode in case context files are edited
 
 OBSIDIAN_ROOT = Path("/home/lisa/Documents/TheLedger")
 CACHE_PATH = "obsidian_cache.json"
@@ -132,6 +131,20 @@ def get_project_context(project_name: str):
 # --------------- MODEL STUFF ---------------
 
 
+def build_history(project: str):
+    main_prompt = load_file(MAIN_PROMPT_PATH)
+    context = get_project_context(project)
+
+    return [
+        {"role": "system", "content": main_prompt},
+        {"role": "system", "content": f"You are assisting with project: {project}."},
+        {
+            "role": "system",
+            "content": f"PROJECT FILES:\n----------------\n{context}\n----------------",
+        },
+    ]
+
+
 def ask_model(messages: list[dict], model: str = "llama3"):
     response = requests.post(
         LLAMA_LOCATION,
@@ -171,20 +184,7 @@ def main():
 
     print(f"\n🦙 Project: {project} | Model: {model} | Type 'quit' to exit.")
 
-    main_prompt = load_file(MAIN_PROMPT_PATH)
-    context = get_project_context(project)
-
-    history = [
-        {
-            "role": "system",
-            "content": main_prompt,
-        },
-        {"role": "system", "content": f"You are assisting with project: {project}."},
-        {
-            "role": "system",
-            "content": f"PROJECT FILES:\n----------------\n{context}\n----------------",
-        },
-    ]
+    history = build_history(project)
 
     # If a question is provided then run non-interactive
     if user_question:
@@ -195,7 +195,9 @@ def main():
         return
 
     # Otherwise run in interactive mode
-    print("\n🦙 Interactive mode. Type 'quit' to exit.")
+    print(
+        "\n🦙 Interactive mode. Type 'quit' to exit. Type ':reload' to reload context."
+    )
 
     while True:
         # Get the input from the user
@@ -204,6 +206,11 @@ def main():
             continue
         if user_query.lower() in {"exit", "quit", "q"}:
             break
+        if user_query.lower() == ":reload":
+            print("\n🔄 Reloading context from vault...\n")
+            history = build_history(project)
+            print("✅ Reloaded.\n")
+            continue
 
         # Ask model, and add both query and response to history
         history.append({"role": "user", "content": user_query})
