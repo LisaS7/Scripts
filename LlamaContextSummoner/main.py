@@ -270,15 +270,19 @@ def main():
     while True:
         # Get the input from the user
         user_query = input("\nHuman 🖤 > ").strip()
+
         if not user_query:
             continue
-        if user_query.lower() in {"exit", "quit", "q"}:
-            break
-        if user_query.lower() == ":reload":
-            print("\n🔄 Reloading context from vault...\n")
-            history = build_history(project)
-            print("✅ Reloaded.\n")
-            continue
+
+        cmd = user_query.lower()
+        match cmd:
+            case "exit" | "quit" | "q":
+                break
+            case ":reload":
+                print("\n🔄 Reloading context from vault...\n")
+                history = build_history(project)
+                print("✅ Reloaded.\n")
+                continue
 
         # Ask model, and add both query and response to history
         history.append({"role": "user", "content": user_query})
