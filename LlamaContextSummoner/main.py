@@ -11,16 +11,20 @@ import requests
 # Stop reading the whole vault on every run. Cache last mod time?
 # Arg to output to xml file?
 # On loading files, measure token size and summarise if large
+# Add :help with descriptions of available commands
 
 OBSIDIAN_ROOT = Path("/home/lisa/Documents/TheLedger")
-CACHE_PATH = "obsidian_cache.json"
-LLAMA_LOCATION = "http://localhost:11434/api/chat"
 MAIN_PROMPT_PATH = Path(
     "/home/lisa/Documents/TheLedger/Areas/The Workshop/Llama/main_prompt.md"
 )
 
 # Increase this if the script is not capturing the entire frontmatter
 FRONTMATTER_READ_LIMIT = 2048  # bytes
+
+# Model settings
+LLAMA_LOCATION = "http://localhost:11434/api/chat"
+CONTEXT_WINDOW = 8192
+AUTO_SUMMARY_THRESHOLD = 6500
 
 
 # --------------- CLI ---------------
@@ -223,12 +227,9 @@ def summarise_conversation(history: list[dict], model: str):
     return new_history
 
 
-def print_history_stats(
-    history: list[dict],
-    last_usage: dict | None,
-    total_prompt_tokens: int,
-    total_output_tokens: int,
-):
+def print_history_stats(history: list[dict], totals):
+    last_usage = totals["last_usage"]
+
     role_counts = {"system": 0, "user": 0, "assistant": 0, "other": 0}
     has_summary = False
 
@@ -259,7 +260,7 @@ def print_history_stats(
     else:
         print("- last call tokens: (none yet)")
 
-    print(f"- totals: in={total_prompt_tokens} out={total_output_tokens}\n")
+    print(f"- totals: in={totals['prompt']} out={totals['output']}\n")
 
 
 # --------------- RUN IT ---------------
@@ -287,17 +288,17 @@ def main():
 
     history = build_history(project)
 
-    total_prompt_tokens = 0
-    total_output_tokens = 0
-    last_usage = None
+    totals = {"prompt": 0, "output": 0, "last_usage": None}
 
     # If a question is provided then run non-interactive
     if user_question:
         history.append({"role": "user", "content": user_question})
         answer, usage = ask_model(history, model=model)
-        last_usage = usage
-        total_prompt_tokens += usage.get("prompt_eval_count") or 0
-        total_output_tokens += usage.get("eval_count") or 0
+
+        totals["last_usage"] = usage
+        totals["prompt"] += usage.get("prompt_eval_count") or 0
+        totals["output"] += usage.get("eval_count") or 0
+
         print("\n🦙 >\n")
         print(answer)
         print(
@@ -332,23 +333,23 @@ def main():
                 print("✅ Summarised.\n")
                 continue
             case ":history" | ":stats":
-                print_history_stats(
-                    history, last_usage, total_prompt_tokens, total_output_tokens
-                )
+                print_history_stats(history, totals)
                 continue
 
         # Ask model, and add both query and response to history
         history.append({"role": "user", "content": user_query})
         answer, usage = ask_model(history, model=model)
-        last_usage = usage
-        total_prompt_tokens += usage.get("prompt_eval_count") or 0
-        total_output_tokens += usage.get("eval_count") or 0
+
+        totals["last_usage"] = usage
+        totals["prompt"] += usage.get("prompt_eval_count") or 0
+        totals["output"] += usage.get("eval_count") or 0
+
         history.append({"role": "assistant", "content": answer})
 
         print("\nLlama 🦙 >\n")
         print(answer)
         print(
-            f"\n🧾 tokens | in: {usage.get('prompt_eval_count')} | out: {usage.get('eval_count')} | total in: {total_prompt_tokens} | total out: {total_output_tokens}\n"
+            f"\n🧾 tokens | in: {usage.get('prompt_eval_count')} | out: {usage.get('eval_count')} | total in: {totals['prompt']} | total out: {totals['output']}\n"
         )
 
 
