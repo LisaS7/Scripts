@@ -10,6 +10,7 @@ import requests
 # TODO:
 # Stop reading the whole vault on every run. Cache last mod time?
 # Arg to output to xml file?
+# On loading files, measure token size and summarise if large
 
 OBSIDIAN_ROOT = Path("/home/lisa/Documents/TheLedger")
 CACHE_PATH = "obsidian_cache.json"
@@ -142,6 +143,58 @@ def build_history(project: str):
             "content": f"PROJECT FILES:\n----------------\n{context}\n----------------",
         },
     ]
+
+
+def summarise_conversation(history: list[dict], model: str):
+    SYSTEM_PREFIX_LEN = 3
+    system_prefix = history[:SYSTEM_PREFIX_LEN]
+    convo = history[SYSTEM_PREFIX_LEN:]
+
+    if not convo:
+        print("📝 Nothing to summarise yet.")
+        return history
+
+    # Conversation to plain text for summary
+    convo_text_lines = []
+    for msg in convo:
+        role = msg.get("role", "user")
+        if role == "user":
+            convo_text_lines.append(f"USER: {msg.get('content','')}")
+        elif role == "assistant":
+            convo_text_lines.append(f"ASSISTANT: {msg.get('content','')}")
+
+    convo_text = "\n".join(convo_text_lines)
+
+    summary_prompt = [
+        {"role": "system", "content": "You write concise, structured summaries."},
+        {
+            "role": "user",
+            "content": (
+                "Summarise the following conversation so it can replace the full chat history.\n\n"
+                "Requirements:\n"
+                "- Use bullet points.\n"
+                "- Include: goals, what was decided, what was tried, key facts, open questions.\n"
+                "- Keep it under ~250 words.\n\n"
+                "CONVERSATION:\n"
+                f"{convo_text}"
+            ),
+        },
+    ]
+
+    summary, usage = ask_model(summary_prompt, model=model)
+
+    new_history = system_prefix + [
+        {
+            "role": "system",
+            "content": "CONVERSATION SUMMARY (most recent):\n" + summary.strip(),
+        }
+    ]
+
+    print(
+        f"\n🧾 summary tokens | in: {usage.get('prompt_eval_count')} | out: {usage.get('eval_count')}\n"
+    )
+
+    return new_history
 
 
 def ask_model(messages: list[dict], model: str = "llama3"):
