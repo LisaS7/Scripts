@@ -329,7 +329,7 @@ def main():
 
     # Otherwise run in interactive mode
     print(
-        "\n🦙 Interactive mode. Type 'quit' to exit. Commands: :reload, :summarise, :history"
+        "\n🦙 Interactive mode. Type 'quit' to exit. Commands: :reload, :summarise, :history, :stats"
     )
 
     while True:
