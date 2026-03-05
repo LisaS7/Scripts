@@ -5,10 +5,9 @@ from pathlib import Path
 import requests
 
 # In Progress:
-# Add a reload command in interactive mode in case context files are edited
+# Deal with context window filling up
 
 # TODO:
-# Deal with context window filling up
 # Stop reading the whole vault on every run. Cache last mod time?
 # Arg to output to xml file?
 
@@ -158,7 +157,15 @@ def ask_model(messages: list[dict], model: str = "llama3"):
 
     response.raise_for_status()
     data = response.json()
-    return data["message"]["content"]
+
+    content = data["message"]["content"]
+
+    usage = {
+        "prompt_eval_count": data.get("prompt_eval_count"),
+        "eval_count": data.get("eval_count"),
+    }
+
+    return content, usage
 
 
 # --------------- RUN IT ---------------
@@ -186,12 +193,20 @@ def main():
 
     history = build_history(project)
 
+    total_prompt_tokens = 0
+    total_output_tokens = 0
+
     # If a question is provided then run non-interactive
     if user_question:
         history.append({"role": "user", "content": user_question})
-        answer = ask_model(history, model=model)
+        answer, usage = ask_model(history, model=model)
+        total_prompt_tokens += usage.get("prompt_eval_count") or 0
+        total_output_tokens += usage.get("eval_count") or 0
         print("\n🦙 >\n")
         print(answer)
+        print(
+            f"\n🧾 tokens | in: {usage.get('prompt_eval_count')} | out: {usage.get('eval_count')}\n"
+        )
         return
 
     # Otherwise run in interactive mode
@@ -214,11 +229,16 @@ def main():
 
         # Ask model, and add both query and response to history
         history.append({"role": "user", "content": user_query})
-        answer = ask_model(history, model=model)
+        answer, usage = ask_model(history, model=model)
+        total_prompt_tokens += usage.get("prompt_eval_count") or 0
+        total_output_tokens += usage.get("eval_count") or 0
         history.append({"role": "assistant", "content": answer})
 
         print("\nLlama 🦙 >\n")
         print(answer)
+        print(
+            f"\n🧾 tokens | in: {usage.get('prompt_eval_count')} | out: {usage.get('eval_count')} | total in: {total_prompt_tokens} | total out: {total_output_tokens}\n"
+        )
 
 
 if __name__ == "__main__":
