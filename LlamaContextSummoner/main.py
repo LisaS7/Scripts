@@ -111,26 +111,35 @@ def extract_frontmatter(path: Path):
     return fm
 
 
-def get_project_context(project_name: str):
-    matched_files = []
+def is_instructions(fm: dict) -> bool:
+    val = fm.get("llama_role", "")
+    return isinstance(val, str) and val.strip().lower() == "instructions"
+
+
+def select_project_files(project_name: str):
+    pinned = []
+    notes = []
 
     for f in OBSIDIAN_ROOT.rglob("*.md"):
         fm = extract_frontmatter(f)
-        if fm.get("project") == project_name:
-            matched_files.append(f)
+        if fm.get("project") != project_name:
+            continue
 
-    print(f"Found {len(matched_files)} files for project '{project_name}'")
+        if is_instructions(fm):
+            pinned.append(f)
+        else:
+            notes.append(f)
 
+    return pinned, notes
+
+
+def render_files(files: list[Path], header: str) -> str:
     chunks = []
-
-    for f in matched_files:
-        with f.open("r", encoding="utf-8") as raw:
-            content = raw.read()
-
+    for f in files:
+        content = load_file(f)
         chunks.append(f"\n\n===== FILE: {f.name} =====\n{content}")
-
-    full_context = "\n".join(chunks)
-    return full_context
+    body = "\n".join(chunks)
+    return f"{header}\n----------------\n{body}\n----------------"
 
 
 # --------------- MODEL STUFF ---------------
@@ -138,15 +147,23 @@ def get_project_context(project_name: str):
 
 def build_history(project: str):
     main_prompt = load_file(MAIN_PROMPT_PATH)
-    context = get_project_context(project)
+    instruction_files, note_files = select_project_files(project)
+
+    print(
+        f"Found {len(instruction_files)} pinned instruction files for project '{project}'"
+    )
+    print(f"Found {len(note_files)} note files for project '{project}'")
+
+    instruction_text = render_files(
+        instruction_files, header="PROJECT INSTRUCTIONS (pinned)"
+    )
+    notes_text = render_files(note_files, header="PROJECT NOTES")
 
     return [
         {"role": "system", "content": main_prompt},
         {"role": "system", "content": f"You are assisting with project: {project}."},
-        {
-            "role": "system",
-            "content": f"PROJECT FILES:\n----------------\n{context}\n----------------",
-        },
+        {"role": "system", "content": instruction_text},
+        {"role": "system", "content": notes_text},
     ]
 
 
