@@ -25,6 +25,7 @@ FRONTMATTER_READ_LIMIT = 2048  # bytes
 LLAMA_LOCATION = "http://localhost:11434/api/chat"
 CONTEXT_WINDOW = 8192
 AUTO_SUMMARY_THRESHOLD = 6500
+WARN_THRESHOLD = 6000
 
 
 # --------------- CLI ---------------
@@ -173,6 +174,30 @@ def ask_model(messages: list[dict], model: str = "llama3"):
     return content, usage
 
 
+def run_model(history: list[dict], model: str, totals: dict):
+    # Note: auto-summarise mutates history in place
+    # So callers don't need to remember to update the value
+
+    answer, usage = ask_model(history, model=model)
+
+    totals["last_usage"] = usage
+    totals["prompt"] += usage.get("prompt_eval_count") or 0
+    totals["output"] += usage.get("eval_count") or 0
+
+    history.append({"role": "assistant", "content": answer})
+
+    prompt_tokens = usage.get("prompt_eval_count") or 0
+
+    if prompt_tokens >= AUTO_SUMMARY_THRESHOLD:
+        print("\n🧠 Context getting full. Auto-summarising...\n")
+        history[:] = summarise_conversation(history, model=model)
+        print("✅ Auto-summarised.\n")
+    elif prompt_tokens >= WARN_THRESHOLD:
+        print("\n⚠️ Approaching context limit. Consider :summarise.\n")
+
+    return answer, usage
+
+
 def summarise_conversation(history: list[dict], model: str):
     SYSTEM_PREFIX_LEN = 3
     system_prefix = history[:SYSTEM_PREFIX_LEN]
@@ -293,11 +318,7 @@ def main():
     # If a question is provided then run non-interactive
     if user_question:
         history.append({"role": "user", "content": user_question})
-        answer, usage = ask_model(history, model=model)
-
-        totals["last_usage"] = usage
-        totals["prompt"] += usage.get("prompt_eval_count") or 0
-        totals["output"] += usage.get("eval_count") or 0
+        answer, usage = run_model(history, model=model, totals=totals)
 
         print("\n🦙 >\n")
         print(answer)
@@ -338,13 +359,7 @@ def main():
 
         # Ask model, and add both query and response to history
         history.append({"role": "user", "content": user_query})
-        answer, usage = ask_model(history, model=model)
-
-        totals["last_usage"] = usage
-        totals["prompt"] += usage.get("prompt_eval_count") or 0
-        totals["output"] += usage.get("eval_count") or 0
-
-        history.append({"role": "assistant", "content": answer})
+        answer, usage = run_model(history, model=model, totals=totals)
 
         print("\nLlama 🦙 >\n")
         print(answer)
